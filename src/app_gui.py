@@ -19,9 +19,13 @@ class PetdentityScraperGUI:
         self.current_data = None
         self.all_records = []
         self.config = Config()
+        self.auto_login_done = False
         
         self.setup_ui()
         self.load_saved_credentials()
+        
+        # Auto-login if credentials exist
+        self.root.after(500, self.auto_login_if_credentials_exist)
         
     def setup_ui(self):
         """Setup the GUI interface"""
@@ -59,6 +63,9 @@ class PetdentityScraperGUI:
         self.save_creds_btn = ttk.Button(cred_frame, text="💾 Save", command=self.save_credentials)
         self.save_creds_btn.grid(row=0, column=4, padx=5)
         
+        self.status_creds_label = ttk.Label(cred_frame, text="", foreground="green")
+        self.status_creds_label.grid(row=0, column=5, padx=5)
+        
         # Control Frame
         control_frame = ttk.Frame(main_frame)
         control_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=5)
@@ -69,7 +76,7 @@ class PetdentityScraperGUI:
         self.url_entry.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E))
         
         # Buttons
-        self.login_btn = ttk.Button(control_frame, text="🔑 Login", command=self.login)
+        self.login_btn = ttk.Button(control_frame, text="🔑 Login", command=self.manual_login)
         self.login_btn.grid(row=0, column=2, padx=5)
         
         self.scrape_btn = ttk.Button(control_frame, text="📥 Scrape & Add", command=self.scrape_and_add, state='disabled')
@@ -82,7 +89,7 @@ class PetdentityScraperGUI:
         self.clear_btn.grid(row=0, column=5, padx=5)
         
         # Status label
-        self.status_label = ttk.Label(main_frame, text="Status: Not logged in", foreground="red")
+        self.status_label = ttk.Label(main_frame, text="Status: Starting up...", foreground="blue")
         self.status_label.grid(row=3, column=0, sticky=(tk.W), pady=5)
         
         # Records Table - Main area
@@ -279,9 +286,13 @@ class PetdentityScraperGUI:
         """Load saved credentials from file"""
         username, password = self.config.load_credentials()
         if username:
+            self.username_entry.delete(0, tk.END)
             self.username_entry.insert(0, username)
+            self.password_entry.delete(0, tk.END)
             self.password_entry.insert(0, password)
-            print("✅ Loaded saved credentials")
+            self.status_creds_label.config(text="✅ Credentials loaded", foreground="green")
+            return True
+        return False
     
     def save_credentials(self):
         """Save credentials to file"""
@@ -289,70 +300,83 @@ class PetdentityScraperGUI:
         password = self.password_entry.get().strip()
         
         if not username or not password:
-            messagebox.showwarning("Warning", "Please enter both username and password")
+            self.status_creds_label.config(text="⚠️ Enter both fields", foreground="red")
             return
         
         if self.config.save_credentials(username, password):
-            messagebox.showinfo("Success", "Credentials saved securely!")
+            self.status_creds_label.config(text="✅ Saved!", foreground="green")
+            # Auto-login after saving
+            self.auto_login_if_credentials_exist()
         else:
-            messagebox.showerror("Error", "Failed to save credentials")
+            self.status_creds_label.config(text="❌ Save failed", foreground="red")
     
-    def login(self):
-        """Handle login process"""
+    def auto_login_if_credentials_exist(self):
+        """Auto-login if credentials exist - NO POPUPS"""
+        if self.auto_login_done:
+            return
+        
         username = self.username_entry.get().strip()
         password = self.password_entry.get().strip()
         
         if not username or not password:
-            manual = messagebox.askyesno("Manual Login", 
-                                        "No credentials found. Would you like to login manually?")
-            if manual:
-                self.manual_login()
+            self.status_label.config(text="Status: Enter credentials and click Save", foreground="orange")
             return
         
         try:
-            self.status_label.config(text="Status: Opening browser...", foreground="orange")
+            self.status_label.config(text="Status: 🔐 Auto-logging in...", foreground="orange")
             self.root.update()
             
             self.scraper = VeterinaryDataScraper(username, password)
             if self.scraper.start_browser():
                 if self.scraper.auto_login():
+                    self.auto_login_done = True
                     self.login_btn.config(state='disabled')
                     self.scrape_btn.config(state='normal')
-                    self.status_label.config(text="Status: ✅ Auto-login successful!", foreground="green")
-                    messagebox.showinfo("Success", "Auto-login successful!")
+                    self.status_label.config(text="Status: ✅ Auto-login successful! Enter URL and click 'Scrape & Add'", 
+                                           foreground="green")
                 else:
-                    self.manual_login()
+                    self.status_label.config(text="Status: ⚠️ Auto-login failed. Click 'Login' to try manually.", 
+                                           foreground="red")
             else:
                 self.status_label.config(text="Status: ❌ Failed to start browser", foreground="red")
-                messagebox.showerror("Error", "Failed to start Firefox.")
                 
         except Exception as e:
-            self.status_label.config(text=f"Status: ❌ Error - {str(e)}", foreground="red")
-            messagebox.showerror("Error", f"Login failed: {str(e)}")
+            self.status_label.config(text=f"Status: ❌ Error - {str(e)[:50]}", foreground="red")
     
     def manual_login(self):
-        """Fallback to manual login"""
+        """Manual login fallback - NO POPUPS"""
         try:
+            username = self.username_entry.get().strip()
+            password = self.password_entry.get().strip()
+            
+            if not username or not password:
+                self.status_label.config(text="Status: ⚠️ Enter credentials first", foreground="red")
+                return
+            
             if not self.scraper:
-                self.scraper = VeterinaryDataScraper()
+                self.scraper = VeterinaryDataScraper(username, password)
                 if not self.scraper.start_browser():
-                    messagebox.showerror("Error", "Failed to start browser")
+                    self.status_label.config(text="Status: ❌ Failed to start browser", foreground="red")
                     return
             
-            self.scraper.manual_login()
-            self.login_btn.config(state='disabled')
-            self.scrape_btn.config(state='normal')
-            self.status_label.config(text="Status: ✅ Manual login confirmed", foreground="green")
+            if self.scraper.auto_login():
+                self.auto_login_done = True
+                self.login_btn.config(state='disabled')
+                self.scrape_btn.config(state='normal')
+                self.status_label.config(text="Status: ✅ Login successful! Enter URL and click 'Scrape & Add'", 
+                                       foreground="green")
+            else:
+                self.status_label.config(text="Status: ❌ Login failed. Check credentials.", foreground="red")
+                
         except Exception as e:
-            self.status_label.config(text=f"Status: ❌ Error - {str(e)}", foreground="red")
-            messagebox.showerror("Error", f"Manual login failed: {str(e)}")
+            self.status_label.config(text=f"Status: ❌ Error - {str(e)[:50]}", foreground="red")
     
     def scrape_and_add(self):
         """Scrape the current page and add to All Records"""
         url = self.url_entry.get().strip()
         
         if not url:
-            messagebox.showwarning("Warning", "Please enter a pet page URL")
+            self.status_label.config(text="Status: ⚠️ Enter a pet page URL", foreground="red")
             return
         
         try:
@@ -361,12 +385,6 @@ class PetdentityScraperGUI:
             
             data = self.scraper.scrape_current_page(url)
             self.current_data = data
-            
-            # Print scraped data for debugging
-            print("\n📊 Scraped Data:")
-            for key, value in data.items():
-                if value:
-                    print(f"  {key}: {value}")
             
             # Add to all records
             self.all_records.append(data.copy())
@@ -389,8 +407,7 @@ class PetdentityScraperGUI:
             self.url_entry.focus()
             
         except Exception as e:
-            self.status_label.config(text=f"Status: ❌ Error - {str(e)}", foreground="red")
-            messagebox.showerror("Error", f"Scraping failed: {str(e)}")
+            self.status_label.config(text=f"Status: ❌ Error - {str(e)[:50]}", foreground="red")
     
     def update_all_records_treeview(self):
         """Update the all records treeview"""
@@ -457,7 +474,7 @@ class PetdentityScraperGUI:
     def export_to_csv(self):
         """Export all records to CSV"""
         if not self.all_records:
-            messagebox.showwarning("Warning", "No records to export")
+            self.status_label.config(text="Status: ⚠️ No records to export", foreground="red")
             return
         
         try:
@@ -534,20 +551,20 @@ class PetdentityScraperGUI:
                     ]
                     writer.writerow(row)
             
-            messagebox.showinfo("Success", f"✅ Exported {len(self.all_records)} records to:\n{filename}")
+            self.status_label.config(text=f"✅ Exported {len(self.all_records)} records to {filename}", 
+                                   foreground="green")
             
         except Exception as e:
-            messagebox.showerror("Error", f"Export failed: {str(e)}")
+            self.status_label.config(text=f"❌ Export failed: {str(e)[:50]}", foreground="red")
     
     def clear_all(self):
         """Clear all records"""
-        if messagebox.askyesno("Confirm", "Clear all records?"):
-            self.all_records = []
-            for item in self.all_tree.get_children():
-                self.all_tree.delete(item)
-            self.record_counter.config(text="📊 Records: 0")
-            self.export_btn.config(state='disabled')
-            self.status_label.config(text="Status: All records cleared", foreground="blue")
+        self.all_records = []
+        for item in self.all_tree.get_children():
+            self.all_tree.delete(item)
+        self.record_counter.config(text="📊 Records: 0")
+        self.export_btn.config(state='disabled')
+        self.status_label.config(text="Status: All records cleared", foreground="blue")
 
 
 def main():

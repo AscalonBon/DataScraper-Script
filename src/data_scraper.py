@@ -8,6 +8,7 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
+from bs4 import BeautifulSoup
 from datetime import datetime
 
 class VeterinaryDataScraper:
@@ -17,6 +18,7 @@ class VeterinaryDataScraper:
         self.data = {}
         self.username = username
         self.password = password
+        self.logged_in = False
         
     def start_browser(self):
         """Initialize Firefox browser"""
@@ -43,7 +45,10 @@ class VeterinaryDataScraper:
         if not url:
             url = "https://app.petdentity.com.ph/session/login"
         
-        print(f"🔐 Navigating to {url}...")
+        if self.logged_in:
+            return True
+        
+        print(f"🔐 Auto-logging in...")
         self.driver.get(url)
         time.sleep(2)
         
@@ -116,40 +121,29 @@ class VeterinaryDataScraper:
                     login_button.click()
                     print("✅ Login button clicked")
                     time.sleep(3)
+                    self.logged_in = True
                     return True
                 else:
-                    print("⚠️ Login button not found. Please login manually.")
+                    print("⚠️ Login button not found")
                     return False
             else:
-                print("⚠️ Login fields not found. Please login manually.")
+                print("⚠️ Login fields not found")
                 return False
                 
         except Exception as e:
             print(f"⚠️ Auto-login failed: {e}")
-            print("Please login manually.")
             return False
     
-    def manual_login(self, url=None):
-        """Manual login fallback"""
-        if not url:
-            url = "https://app.petdentity.com.ph/session/login"
-        
-        self.driver.get(url)
-        print("\n" + "=" * 70)
-        print("🔑 MANUAL LOGIN REQUIRED")
-        print("=" * 70)
-        print("📌 Please login manually in the Firefox window")
-        print("⏳ Press ENTER here when you're logged in and ready to scrape")
-        print("=" * 70)
-        input()
-        return True
-    
     def scrape_current_page(self, url=None):
-        """Scrape the current page data using direct element finding"""
+        """Scrape the current page data using exact HTML structure"""
         if url:
             print(f"🔗 Navigating to: {url}")
             self.driver.get(url)
             time.sleep(3)
+        
+        # Get page source and parse with BeautifulSoup
+        page_source = self.driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
         
         # Reset data
         self.data = {
@@ -188,192 +182,318 @@ class VeterinaryDataScraper:
             'vaccine_expiration_3': ''
         }
         
-        # Method 1: Find by label text and get the next element's text
-        self.extract_by_labels()
+        # Extract using exact HTML structure
+        self.extract_exact_structure(soup)
         
-        # Method 2: Find all text and parse with better logic
-        self.extract_from_page_text()
-        
-        # Clean up empty values
+        # Clean up
         self.clean_data()
         
         return self.data
     
-    def extract_by_labels(self):
-        """Extract data by finding label elements and their following siblings"""
-        print("\n🔍 Extracting by labels...")
+    def extract_exact_structure(self, soup):
+        """Extract data using the exact HTML structure provided"""
+        print("\n🔍 Extracting data using exact HTML structure...")
         
-        # Label to field mapping
-        label_map = {
-            'Pet Name': 'pet_name',
-            'BirthDate': 'birthdate',
-            'Age': 'age',
-            'Weight': 'weight',
-            'Animal': 'species',
-            'Breed': 'breed',
-            'Gender': 'gender',
-            'Coat(Color)': 'color',
-            'Coat Remarks': 'coat_remarks',
-            'Privacy': 'privacy',
-            'Pet Status': 'pet_status'
-        }
+        # ============================================================
+        # 1. Extract Pet Information - div with class="text-body-1 text-primary"
+        # ============================================================
+        print("\n  📋 Extracting Pet Information...")
         
-        for label_text, field_name in label_map.items():
-            try:
-                # Find element containing the label text
-                label_elements = self.driver.find_elements(By.XPATH, f"//*[contains(text(), '{label_text}')]")
-                for elem in label_elements:
-                    # Get the next sibling or following element that contains the value
-                    try:
-                        # Try next sibling
-                        next_elem = elem.find_element(By.XPATH, "./following-sibling::*[1]")
-                        value = next_elem.text.strip()
-                    except:
-                        try:
-                            # Try following element
-                            next_elem = elem.find_element(By.XPATH, "./following::*[1]")
-                            value = next_elem.text.strip()
-                        except:
-                            continue
-                    
-                    if value and value != "NaN cm(s)" and value != "No data available":
-                        self.data[field_name] = value
-                        print(f"  ✅ Found {field_name}: {value}")
-                        break
-            except Exception as e:
-                continue
+        # Find all label-value pairs
+        label_elements = soup.find_all('div', class_='text-body-1 text-primary')
         
-        # Extract Owner Name and Mobile - look for the specific pattern
-        try:
-            # Look for "Name" label
-            name_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Name')]")
-            for elem in name_elements:
-                try:
-                    next_elem = elem.find_element(By.XPATH, "./following-sibling::*[1]")
-                    value = next_elem.text.strip()
-                    if value and len(value.split()) >= 2 and 'Actions' not in value:
-                        self.data['owner_name'] = value
-                        print(f"  ✅ Found Owner Name: {value}")
-                        break
-                except:
-                    continue
-        except:
-            pass
-        
-        # Extract Mobile - look for 11-13 digit numbers
-        try:
-            page_text = self.driver.find_element(By.TAG_NAME, "body").text
-            phones = re.findall(r'(\d{11,13})', page_text)
-            if phones:
-                self.data['mobile'] = phones[0]
-                print(f"  ✅ Found Mobile: {phones[0]}")
+        for label_elem in label_elements:
+            label_text = label_elem.get_text().strip()
+            
+            # Find the next sibling that contains the value
+            value_elem = label_elem.find_next_sibling('div', class_='text-body-1')
+            if not value_elem:
+                value_elem = label_elem.find_next_sibling()
+            
+            if value_elem:
+                value = value_elem.get_text().strip()
                 
-                # Additional contacts
-                for i, phone in enumerate(phones[1:4], 1):
-                    self.data['additional_contacts'][i-1] = phone
-                    print(f"  ✅ Found Additional Contact {i}: {phone}")
-        except:
-            pass
+                # Map labels to fields
+                if label_text == 'Pet Name':
+                    self.data['pet_name'] = value
+                    print(f"    ✅ Pet Name: {value}")
+                elif label_text == 'BirthDate':
+                    self.data['birthdate'] = value
+                    print(f"    ✅ Birthdate: {value}")
+                elif label_text == 'Age':
+                    self.data['age'] = value
+                    print(f"    ✅ Age: {value}")
+                elif label_text == 'Weight':
+                    self.data['weight'] = value
+                    print(f"    ✅ Weight: {value}")
+                elif label_text == 'Animal':
+                    self.data['species'] = value
+                    print(f"    ✅ Species: {value}")
+                elif label_text == 'Breed':
+                    self.data['breed'] = value
+                    print(f"    ✅ Breed: {value}")
+                elif label_text == 'Gender':
+                    self.data['gender'] = value
+                    print(f"    ✅ Gender: {value}")
+                elif label_text == 'Coat(Color)':
+                    self.data['color'] = value
+                    print(f"    ✅ Color: {value}")
+                elif label_text == 'Coat Remarks':
+                    self.data['coat_remarks'] = value
+                    print(f"    ✅ Coat Remarks: {value}")
+                elif label_text == 'Privacy':
+                    self.data['privacy'] = value
+                    print(f"    ✅ Privacy: {value}")
+                elif label_text == 'Pet Status':
+                    self.data['pet_status'] = value
+                    print(f"    ✅ Pet Status: {value}")
         
-        # Extract Address - look for address patterns
-        try:
-            # Look for elements with address-like text
-            address_found = False
-            elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), 'Unit') or contains(text(), 'Street') or contains(text(), 'Barangay')]")
-            for elem in elements:
-                text = elem.text.strip()
-                if text and len(text) > 20 and ',' in text:
-                    # Check if it's an address (contains numbers and words)
-                    if re.search(r'\d+', text) and re.search(r'[A-Z]', text):
-                        self.data['address'] = text
-                        print(f"  ✅ Found Address: {text[:50]}...")
-                        address_found = True
-                        break
-        except:
-            pass
+        # ============================================================
+        # 2. Extract Address - div with class="text-body-1 font-weight-medium"
+        # ============================================================
+        print("\n  📋 Extracting Address...")
         
-        # Extract Microchip - look for 15-digit numbers
-        try:
-            page_text = self.driver.find_element(By.TAG_NAME, "body").text
-            microchips = re.findall(r'(\d{15})', page_text)
-            if microchips:
-                self.data['microchip'] = microchips[0]
-                print(f"  ✅ Found Microchip: {microchips[0]}")
-        except:
-            pass
-    
-    def extract_from_page_text(self):
-        """Fallback: Parse the page text directly"""
-        print("\n🔍 Extracting from page text...")
+        # Find street address
+        street_elem = soup.find('div', class_='text-body-1 font-weight-medium')
+        if street_elem:
+            self.data['house_no'] = street_elem.get_text().strip()
+            print(f"    ✅ House No/Street: {self.data['house_no']}")
         
-        try:
-            page_text = self.driver.find_element(By.TAG_NAME, "body").text
-            lines = [line.strip() for line in page_text.split('\n') if line.strip()]
+        # Find city/barangay (text-caption text-grey)
+        caption_elems = soup.find_all('div', class_='text-caption text-grey')
+        if len(caption_elems) >= 2:
+            self.data['city_municipality'] = caption_elems[0].get_text().strip()
+            self.data['province'] = caption_elems[1].get_text().strip()
+            print(f"    ✅ City: {self.data['city_municipality']}")
+            print(f"    ✅ Province: {self.data['province']}")
+        
+        # Build complete address
+        address_parts = []
+        if self.data.get('house_no'):
+            address_parts.append(self.data['house_no'])
+        if self.data.get('city_municipality'):
+            address_parts.append(self.data['city_municipality'])
+        if self.data.get('province'):
+            address_parts.append(self.data['province'])
+        
+        if address_parts:
+            self.data['address'] = ', '.join(address_parts)
+            print(f"    ✅ Complete Address: {self.data['address'][:50]}...")
+        
+        # ============================================================
+        # 3. Extract Owner Name and Mobile from the page
+        # ============================================================
+        print("\n  📋 Extracting Owner Information...")
+        
+        # Get all text from the page
+        page_text = soup.get_text()
+        
+        # Look for owner name pattern - name with 2+ parts followed by phone
+        name_pattern = r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s+[A-Z]\.)?(?:\s+[A-Z][a-z]+)+)'
+        phone_pattern = r'(\d{11,13})'
+        
+        # Find all phones
+        phones = re.findall(phone_pattern, page_text)
+        
+        # Find all names
+        names = re.findall(name_pattern, page_text)
+        
+        # Filter out common UI words
+        exclude_words = ['Actions', 'Action', 'Menu', 'Home', 'Back', 'Next', 'Save', 
+                        'Cancel', 'Delete', 'Edit', 'Update', 'Submit', 'Search',
+                        'View', 'Print', 'Export', 'Import', 'Settings', 'Profile',
+                        'Account', 'Logout', 'Dashboard', 'Reports', 'Help',
+                        'Name', 'Mobile', 'Address', 'Contact', 'Phone', 'Email',
+                        'Type', 'Form', 'RFID', 'Microchip', 'Pet', 'Animal',
+                        'Gender', 'Breed', 'BirthDate', 'Age', 'Weight', 'Coat']
+        
+        if phones:
+            owner_found = False
             
-            # Look for owner name pattern - a name with 2+ parts followed by a phone number
-            for i, line in enumerate(lines):
-                # Check if this line looks like a name (2+ words, starts with capital)
-                if re.match(r'^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+', line):
-                    # Check if next line is a phone number
-                    if i + 1 < len(lines) and re.match(r'^\d{11,13}$', lines[i+1]):
-                        if 'Actions' not in line:
-                            self.data['owner_name'] = line
-                            self.data['mobile'] = lines[i+1]
-                            print(f"  ✅ Found Owner (alt): {line}")
-                            print(f"  ✅ Found Mobile (alt): {lines[i+1]}")
-                            break
+            for i, phone in enumerate(phones):
+                # Find position of this phone number
+                phone_pos = page_text.find(phone)
+                
+                # Look for the closest name BEFORE this phone number
+                text_before = page_text[max(0, phone_pos - 300):phone_pos]
+                names_before = re.findall(name_pattern, text_before)
+                
+                # Filter out excluded words
+                filtered_names = []
+                for n in names_before:
+                    if n not in exclude_words and len(n.split()) >= 2:
+                        filtered_names.append(n)
+                
+                if filtered_names:
+                    full_name = filtered_names[-1].strip()
+                    
+                    if not owner_found:
+                        self.data['owner_name'] = full_name
+                        self.data['mobile'] = phone
+                        print(f"    ✅ Owner Name: {full_name}")
+                        print(f"    ✅ Mobile: {phone}")
+                        owner_found = True
+                    else:
+                        # Additional contact
+                        contact_entry = f"{full_name} - {phone}"
+                        existing_contacts = [c.split(' - ')[0] for c in self.data['additional_contacts']]
+                        if full_name not in existing_contacts and full_name != self.data.get('owner_name', ''):
+                            self.data['additional_contacts'].append(contact_entry)
+                            print(f"    ✅ Additional Contact: {contact_entry}")
+        
+        # If owner not found, look for "Name" label
+        if not self.data.get('owner_name'):
+            name_label = soup.find(string=re.compile(r'^Name$'))
+            if name_label:
+                parent = name_label.parent
+                if parent:
+                    next_sibling = parent.find_next_sibling()
+                    if next_sibling:
+                        name_value = next_sibling.get_text().strip()
+                        if name_value and 'Actions' not in name_value and len(name_value.split()) >= 2:
+                            self.data['owner_name'] = name_value
+                            print(f"    ✅ Owner Name (from label): {name_value}")
+        
+        # ============================================================
+        # 4. Extract Microchip (UID)
+        # ============================================================
+        print("\n  📋 Extracting Microchip...")
+        
+        # Look for 15-digit numbers
+        microchips = re.findall(r'(\d{15})', page_text)
+        if microchips:
+            self.data['microchip'] = microchips[0]
+            print(f"    ✅ Microchip: {microchips[0]}")
+        
+        # Look for "UID" label
+        uid_label = soup.find(string=re.compile(r'UID', re.IGNORECASE))
+        if uid_label:
+            parent = uid_label.parent
+            if parent:
+                next_sibling = parent.find_next_sibling()
+                if next_sibling:
+                    uid_value = next_sibling.get_text().strip()
+                    if re.match(r'^\d{15}$', uid_value):
+                        self.data['microchip'] = uid_value
+                        print(f"    ✅ Microchip (from UID): {uid_value}")
+        
+        # ============================================================
+        # 5. Extract Vaccination Dates
+        # ============================================================
+        print("\n  📋 Extracting Vaccination Data...")
+        
+        date_pattern = r'([A-Za-z]{3}\s\d{2},\s\d{4})'
+        all_dates = re.findall(date_pattern, page_text)
+        
+        # Look for date pairs (vaccination date and expiration)
+        date_pairs = re.findall(r'([A-Za-z]{3}\s\d{2},\s\d{4})\s+([A-Za-z]{3}\s\d{2},\s\d{4})', page_text)
+        
+        if date_pairs:
+            for idx, (date1, date2) in enumerate(date_pairs[:3], 1):
+                # Skip if this is BirthDate
+                birthdate = self.data.get('birthdate', '')
+                if date1 == birthdate:
+                    continue
+                    
+                self.data[f'vaccination_date_{idx}'] = date1
+                self.data[f'vaccine_expiration_{idx}'] = date2
+                print(f"    ✅ Vaccination {idx}: {date1} -> {date2}")
+        
+        # If no date pairs found, try looking for dates in sequence
+        if not date_pairs and len(all_dates) >= 2:
+            # Skip the first date if it's BirthDate
+            start_idx = 0
+            if all_dates[0] == self.data.get('birthdate'):
+                start_idx = 1
             
-            # If address not found, look for it
-            if not self.data.get('address'):
-                address_pattern = r'(Unit\s+\d+[^,]+,\s+[^,]+,\s+[^,]+)'
-                match = re.search(address_pattern, page_text)
-                if match:
-                    self.data['address'] = match.group(1)
-                    print(f"  ✅ Found Address (alt): {self.data['address'][:50]}...")
-            
-        except Exception as e:
-            print(f"  ⚠️ Alt extraction error: {e}")
+            vax_idx = 1
+            for i in range(start_idx, len(all_dates) - 1, 2):
+                if vax_idx > 3:
+                    break
+                if i + 1 < len(all_dates):
+                    self.data[f'vaccination_date_{vax_idx}'] = all_dates[i]
+                    self.data[f'vaccine_expiration_{vax_idx}'] = all_dates[i + 1]
+                    print(f"    ✅ Vaccination {vax_idx}: {all_dates[i]} -> {all_dates[i + 1]}")
+                    vax_idx += 1
+        
+        # ============================================================
+        # 6. Check for "No data available" in vaccination table
+        # ============================================================
+        no_data = soup.find('td', string='No data available')
+        if no_data:
+            print("    ℹ️ No vaccination data available")
+        
+        # ============================================================
+        # 7. Extract Additional Contacts from the page
+        # ============================================================
+        print("\n  📋 Extracting Additional Contacts...")
+        
+        # Look for phone numbers not already captured
+        if phones:
+            contact_idx = 0
+            for phone in phones:
+                # Skip the main mobile number
+                if phone == self.data.get('mobile'):
+                    continue
+                
+                if contact_idx >= 3:
+                    break
+                
+                # Try to find name near this phone
+                phone_pos = page_text.find(phone)
+                text_before = page_text[max(0, phone_pos - 200):phone_pos]
+                names_before = re.findall(name_pattern, text_before)
+                
+                # Filter out excluded words
+                filtered_names = []
+                for n in names_before:
+                    if n not in exclude_words and len(n.split()) >= 2:
+                        filtered_names.append(n)
+                
+                if filtered_names:
+                    contact_name = filtered_names[-1].strip()
+                    self.data['additional_contacts'][contact_idx] = f"{contact_name} - {phone}"
+                else:
+                    self.data['additional_contacts'][contact_idx] = phone
+                
+                print(f"    ✅ Additional Contact {contact_idx + 1}: {self.data['additional_contacts'][contact_idx]}")
+                contact_idx += 1
     
     def clean_data(self):
-        """Clean up and ensure all fields have values"""
+        """Clean up data"""
         print("\n🧹 Cleaning data...")
         
-        # If owner_name contains 'Actions', try to get it from page text
-        if 'Actions' in self.data.get('owner_name', ''):
-            try:
-                page_text = self.driver.find_element(By.TAG_NAME, "body").text
-                # Look for a name after "Name" label
-                match = re.search(r'Name\s*\n\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', page_text)
-                if match:
-                    self.data['owner_name'] = match.group(1)
-                    print(f"  ✅ Fixed Owner Name: {self.data['owner_name']}")
-            except:
-                pass
-        
-        # If owner_name is still 'Actions Name', try harder
-        if self.data.get('owner_name') == 'Actions Name' or 'Actions' in self.data.get('owner_name', ''):
-            try:
-                page_text = self.driver.find_element(By.TAG_NAME, "body").text
-                # Look for a name with 3+ parts that has "V." in it (like "Pilita Remedios V. Venzuela")
-                match = re.search(r'([A-Z][a-z]+\s+[A-Z][a-z]+\s+[A-Z]\.\s+[A-Z][a-z]+)', page_text)
-                if match:
-                    self.data['owner_name'] = match.group(1)
-                    print(f"  ✅ Fixed Owner Name (V. pattern): {self.data['owner_name']}")
-                else:
-                    # Try another pattern
-                    match = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,})', page_text)
-                    if match:
-                        potential = match.group(1)
-                        if len(potential.split()) >= 3 and 'Actions' not in potential:
-                            self.data['owner_name'] = potential
-                            print(f"  ✅ Fixed Owner Name (alt): {self.data['owner_name']}")
-            except:
-                pass
-        
-        # Clean weight - remove 'kg' if present
+        # Clean weight - remove 'kg' and extra text
         if self.data.get('weight'):
-            self.data['weight'] = re.sub(r'[^0-9.]', '', self.data['weight'])
+            weight_match = re.search(r'(\d+\.?\d*)', self.data['weight'])
+            if weight_match:
+                self.data['weight'] = weight_match.group(1)
+            else:
+                self.data['weight'] = ''
+        
+        # If owner_name contains 'Actions', clear it
+        if 'Actions' in self.data.get('owner_name', ''):
+            self.data['owner_name'] = ''
         
         # Ensure additional_contacts has 3 items
         while len(self.data.get('additional_contacts', [])) < 3:
             self.data['additional_contacts'].append('')
+        
+        # Fill in missing vaccination fields
+        for i in range(1, 4):
+            for field in ['vaccination_date', 'vaccine_type', 'vaccine_lot', 'vaccine_expiration']:
+                key = f'{field}_{i}'
+                if key not in self.data:
+                    self.data[key] = ''
+        
+        # Ensure address components are set
+        if not self.data.get('address') and self.data.get('house_no'):
+            address_parts = []
+            if self.data.get('house_no'):
+                address_parts.append(self.data['house_no'])
+            if self.data.get('city_municipality'):
+                address_parts.append(self.data['city_municipality'])
+            if self.data.get('province'):
+                address_parts.append(self.data['province'])
+            if address_parts:
+                self.data['address'] = ', '.join(address_parts)
