@@ -573,7 +573,7 @@ class VeterinaryDataScraper:
         if self.data.get('weight'):
             weight_match = re.search(r'(\d+\.?\d*)', self.data['weight'])
             if weight_match:
-                self.data['weight'] = weight_match.group(1)
+                self.data['weight'] = f"{weight_match.group(1)} kg(s)"
             else:
                 self.data['weight'] = ''
         
