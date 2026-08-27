@@ -6,17 +6,15 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 block_cipher = None
 
-# Collect data files from dependencies
+# Collect data files
 datas = []
 datas += collect_data_files('selenium')
 datas += collect_data_files('webdriver_manager')
 datas += collect_data_files('bs4')
-
-# Add assets and data directories
 datas += [('assets', 'assets')]
 datas += [('data', 'data')]
 
-# Hidden imports for dynamic imports
+# Hidden imports
 hiddenimports = [
     'selenium',
     'selenium.webdriver',
@@ -41,7 +39,6 @@ hiddenimports = [
     'tkinter.ttk',
 ]
 
-# Analysis
 a = Analysis(
     ['src/main.py'],
     pathex=[],
@@ -60,7 +57,6 @@ a = Analysis(
 
 pyd = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# Create the executable
 exe = EXE(
     pyd,
     a.scripts,
@@ -75,23 +71,12 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # Set to True to show console window for debugging
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     icon='assets/icon.ico' if os.path.exists('assets/icon.ico') else None,
+    manifest='manifest.xml' if os.path.exists('manifest.xml') else None,  # 👈 KEY FIX
 )
-
-# Create a one-file bundle (optional - comment out if you want multiple files)
-# coll = COLLECT(
-#     exe,
-#     a.binaries,
-#     a.zipfiles,
-#     a.datas,
-#     strip=False,
-#     upx=True,
-#     upx_exclude=[],
-#     name='PetdentityScraper',
-# )

@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.firefox import GeckoDriverManager
 from bs4 import BeautifulSoup
 from datetime import datetime
+import geckodriver_autoinstaller
 
 class VeterinaryDataScraper:
     def __init__(self, username=None, password=None):
@@ -23,6 +24,7 @@ class VeterinaryDataScraper:
     def start_browser(self):
         """Initialize Firefox browser"""
         try:
+            geckodriver_autoinstaller.install()
             service = Service(GeckoDriverManager().install())
             self.driver = webdriver.Firefox(service=service, options=self.options)
             print("✅ Firefox started successfully")

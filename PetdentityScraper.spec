@@ -4,9 +4,9 @@
 a = Analysis(
     ['src/main.py'],
     pathex=[],
-    binaries=[],
+    binaries=[('geckodriver.exe', '.')],
     datas=[('assets', 'assets'), ('data', 'data')],
-    hiddenimports=['selenium', 'webdriver_manager', 'beautifulsoup4', 'lxml', 'PIL', 'PIL.Image', 'PIL.ImageTk', 'bs4.builder._htmlparser', 'bs4.builder._lxml'],
+    hiddenimports=['selenium', 'webdriver_manager', 'beautifulsoup4', 'lxml', 'PIL', 'PIL.Image', 'PIL.ImageTk'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
