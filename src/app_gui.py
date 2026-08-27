@@ -14,7 +14,7 @@ class PetdentityScraperGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Petdentity Data Scraper")
-        self.root.geometry("1500x850")
+        self.root.geometry("1600x850")
 
         self.scraper = None
         self.current_data = None
@@ -118,18 +118,19 @@ class PetdentityScraperGUI:
         instruction_label.grid(row=0, column=1, sticky=tk.E)
 
     def create_all_records_treeview(self, parent):
-        """Create the treeview with all required columns"""
+        """Create the treeview with all required columns including Contact Address"""
 
         # Create frame with scrollbars
         tree_container = ttk.Frame(parent)
         tree_container.pack(fill=tk.BOTH, expand=True)
 
-        # Define columns
+        # Define columns - Added 'Contact Address' after 'Complete Address'
         columns = (
             '#',
             'Pet Owner Fullname',
             'Mobile Number',
             'Complete Address',
+            'Contact Address',  # NEW: Separate contact address column
             'Additional Contact 1',
             'Additional Contact 2',
             'Additional Contact 3',
@@ -169,7 +170,8 @@ class PetdentityScraperGUI:
             '#': 40,
             'Pet Owner Fullname': 200,
             'Mobile Number': 130,
-            'Complete Address': 300,
+            'Complete Address': 250,
+            'Contact Address': 250,  # NEW: Contact Address column
             'Additional Contact 1': 200,
             'Additional Contact 2': 200,
             'Additional Contact 3': 200,
@@ -430,16 +432,15 @@ class PetdentityScraperGUI:
             address_parts = []
             if record.get('house_no'):
                 address_parts.append(record.get('house_no'))
-            if record.get('street'):
-                address_parts.append(record.get('street'))
-            if record.get('barangay'):
-                address_parts.append(record.get('barangay'))
             if record.get('city_municipality'):
                 address_parts.append(record.get('city_municipality'))
             if record.get('province'):
                 address_parts.append(record.get('province'))
 
             complete_address = ', '.join(address_parts) if address_parts else record.get('address', '')
+            
+            # Get the separate contact address
+            contact_address = record.get('contact_address', '')
 
             color_markings = record.get('color', '')
             coat_remarks = record.get('coat_remarks', '')
@@ -454,6 +455,7 @@ class PetdentityScraperGUI:
                 record.get('owner_name', ''),
                 record.get('mobile', ''),
                 complete_address,
+                contact_address,  # NEW: Contact Address column
                 contacts[0] if contacts[0] else '',
                 contacts[1] if contacts[1] else '',
                 contacts[2] if contacts[2] else '',
@@ -494,7 +496,7 @@ class PetdentityScraperGUI:
             filename = f"pet_records_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
             headers = [
-                '#', 'Pet Owner Fullname', 'Mobile Number', 'Complete Address',
+                '#', 'Pet Owner Fullname', 'Mobile Number', 'Complete Address', 'Contact Address',
                 'Additional Contact 1', 'Additional Contact 2', 'Additional Contact 3',
                 'Date of Birth', 'Weight (Kg)', 'Sex', 'Color / Markings',
                 'Microchip Number',
@@ -515,16 +517,15 @@ class PetdentityScraperGUI:
                     address_parts = []
                     if record.get('house_no'):
                         address_parts.append(record.get('house_no'))
-                    if record.get('street'):
-                        address_parts.append(record.get('street'))
-                    if record.get('barangay'):
-                        address_parts.append(record.get('barangay'))
                     if record.get('city_municipality'):
                         address_parts.append(record.get('city_municipality'))
                     if record.get('province'):
                         address_parts.append(record.get('province'))
 
                     complete_address = ', '.join(address_parts) if address_parts else record.get('address', '')
+                    
+                    # Get the separate contact address
+                    contact_address = record.get('contact_address', '')
 
                     color_markings = record.get('color', '')
                     coat_remarks = record.get('coat_remarks', '')
@@ -539,6 +540,7 @@ class PetdentityScraperGUI:
                         record.get('owner_name', ''),
                         record.get('mobile', ''),
                         complete_address,
+                        contact_address,  # NEW: Contact Address column
                         contacts[0] if contacts[0] else '',
                         contacts[1] if contacts[1] else '',
                         contacts[2] if contacts[2] else '',
