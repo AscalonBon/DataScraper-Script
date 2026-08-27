@@ -8,12 +8,17 @@ from datetime import datetime
 # Import from other modules
 from data_scraper import VeterinaryDataScraper
 from config import Config
+from shortcuts import ShortcutManager  
 
 
 class PetdentityScraperGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Petdentity Data Scraper")
+        
+        # Set window icon
+        self.set_window_icon()
+        
         self.root.geometry("1600x850")
 
         self.scraper = None
@@ -21,12 +26,60 @@ class PetdentityScraperGUI:
         self.all_records = []
         self.config = Config()
         self.auto_login_done = False
+        self.logo_image = None  # Keep reference to prevent garbage collection
 
         self.setup_ui()
         self.load_saved_credentials()
 
+        # ============================================================
+        # INITIALIZE SHORTCUT MANAGER
+        # ============================================================
+        self.shortcuts = ShortcutManager(self.root, self)
+        print("✅ Shortcut manager initialized")
+
         # Auto-login if credentials exist
         self.root.after(500, self.auto_login_if_credentials_exist)
+
+    def set_window_icon(self):
+        """Set the window icon for the application"""
+        try:
+            # Get the path to the icon
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(script_dir)
+            icon_path = os.path.join(parent_dir, 'assets', 'logo.png')
+            
+            if os.path.exists(icon_path):
+                try:
+                    from PIL import Image
+                    import tempfile
+                    
+                    # Convert PNG to ICO in memory
+                    img = Image.open(icon_path)
+                    
+                    # Create a temporary ICO file
+                    with tempfile.NamedTemporaryFile(suffix='.ico', delete=False) as tmp:
+                        img.save(tmp.name, format='ICO', sizes=[(32, 32), (64, 64), (128, 128), (256, 256)])
+                        tmp_path = tmp.name
+                    
+                    # Set the icon
+                    self.root.iconbitmap(default=tmp_path)
+                    
+                    # Clean up temp file after setting icon
+                    import atexit
+                    atexit.register(lambda: os.unlink(tmp_path) if os.path.exists(tmp_path) else None)
+                    
+                    print(f"✅ Window icon set from: {icon_path}")
+                except ImportError:
+                    # PIL not installed, try direct PNG (may not work on Windows)
+                    try:
+                        self.root.iconphoto(True, tk.PhotoImage(file=icon_path))
+                        print(f"✅ Window icon set (PNG): {icon_path}")
+                    except:
+                        print(f"⚠️ Could not set icon from PNG, PIL required for Windows icon")
+            else:
+                print(f"⚠️ Icon file not found: {icon_path}")
+        except Exception as e:
+            print(f"⚠️ Could not set icon: {e}")
 
     def setup_ui(self):
         """Setup the GUI interface"""
@@ -43,10 +96,47 @@ class PetdentityScraperGUI:
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(4, weight=1)
 
-        # Title
-        title_label = ttk.Label(main_frame, text="🐾 Petdentity Veterinary Data Scraper",
-                                font=('Arial', 16, 'bold'))
-        title_label.grid(row=0, column=0, pady=5, sticky=tk.W)
+        # Title with Logo
+        title_frame = ttk.Frame(main_frame)
+        title_frame.grid(row=0, column=0, pady=5, sticky=tk.W)
+        
+        # Try to load and display logo image
+        try:
+            from PIL import Image, ImageTk
+            
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(script_dir)
+            logo_path = os.path.join(parent_dir, 'assets', '566598750_829426946347885_1537385991389694105_n.png')
+            
+            if os.path.exists(logo_path):
+                # Load and resize the image
+                image = Image.open(logo_path)
+                
+                # Resize to 40x40 for the title bar
+                image = image.resize((40, 40), Image.Resampling.LANCZOS)
+                self.logo_image = ImageTk.PhotoImage(image)
+                
+                # Create label with image
+                logo_label = ttk.Label(title_frame, image=self.logo_image)
+                logo_label.grid(row=0, column=0, padx=(0, 10))
+                
+                # Title text next to logo
+                title_label = ttk.Label(title_frame, text="Petdentity Veterinary Data Scraper",
+                                       font=('Arial', 16, 'bold'))
+                title_label.grid(row=0, column=1)
+                print(f"✅ Logo loaded from: {logo_path}")
+            else:
+                # No logo found, just show text
+                title_label = ttk.Label(title_frame, text="🐾 Petdentity Veterinary Data Scraper",
+                                       font=('Arial', 16, 'bold'))
+                title_label.grid(row=0, column=0)
+                print(f"⚠️ Logo file not found: {logo_path}")
+        except ImportError:
+            # PIL not installed, just show text
+            title_label = ttk.Label(title_frame, text="🐾 Petdentity Veterinary Data Scraper",
+                                   font=('Arial', 16, 'bold'))
+            title_label.grid(row=0, column=0)
+            print("⚠️ PIL not installed, cannot display logo image")
 
         # Credentials Frame
         cred_frame = ttk.LabelFrame(main_frame, text="Login Credentials", padding="10")
@@ -76,19 +166,16 @@ class PetdentityScraperGUI:
         self.url_entry = ttk.Entry(control_frame, width=60)
         self.url_entry.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E))
 
-        # Buttons
-        self.login_btn = ttk.Button(control_frame, text="🔑 Login", command=self.manual_login)
-        self.login_btn.grid(row=0, column=2, padx=5)
-
+        # Buttons - REMOVED Login button
         self.scrape_btn = ttk.Button(control_frame, text="📥 Scrape & Add", command=self.scrape_and_add,
                                      state='disabled')
-        self.scrape_btn.grid(row=0, column=3, padx=5)
+        self.scrape_btn.grid(row=0, column=2, padx=5)
 
         self.export_btn = ttk.Button(control_frame, text="📊 Export CSV", command=self.export_to_csv, state='disabled')
-        self.export_btn.grid(row=0, column=4, padx=5)
+        self.export_btn.grid(row=0, column=3, padx=5)
 
         self.clear_btn = ttk.Button(control_frame, text="🗑️ Clear All", command=self.clear_all)
-        self.clear_btn.grid(row=0, column=5, padx=5)
+        self.clear_btn.grid(row=0, column=4, padx=5)
 
         # Status label
         self.status_label = ttk.Label(main_frame, text="Status: Starting up...", foreground="blue")
@@ -340,13 +427,13 @@ class PetdentityScraperGUI:
             if self.scraper.start_browser():
                 if self.scraper.auto_login():
                     self.auto_login_done = True
-                    self.login_btn.config(state='disabled')
+                    # REMOVED: self.login_btn.config(state='disabled')  <- This was the problem
                     self.scrape_btn.config(state='normal')
                     self.status_label.config(text="Status: ✅ Auto-login successful! Enter URL and click 'Scrape & Add'",
-                                             foreground="green")
+                                            foreground="green")
                 else:
-                    self.status_label.config(text="Status: ⚠️ Auto-login failed. Click 'Login' to try manually.",
-                                             foreground="red")
+                    self.status_label.config(text="Status: ⚠️ Auto-login failed. Check credentials and click Save again.",
+                                            foreground="red")
             else:
                 self.status_label.config(text="Status: ❌ Failed to start browser", foreground="red")
 
@@ -581,13 +668,3 @@ class PetdentityScraperGUI:
         self.record_counter.config(text="📊 Records: 0")
         self.export_btn.config(state='disabled')
         self.status_label.config(text="Status: All records cleared", foreground="blue")
-
-
-def main():
-    root = tk.Tk()
-    app = PetdentityScraperGUI(root)
-    root.mainloop()
-
-
-if __name__ == "__main__":
-    main()

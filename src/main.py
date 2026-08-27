@@ -19,6 +19,8 @@ def main():
     """Main entry point"""
     try:
         root = tk.Tk()
+        root.state('zoomed')
+        root.bind('<Escape>', lambda e: root.attributes('-fullscreen', False))
         app = PetdentityScraperGUI(root)
         root.mainloop()
     except Exception as e:
