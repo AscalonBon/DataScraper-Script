@@ -1,4 +1,30 @@
-./src/__pycache__/
-./build
-./data/credentials.json
-./build
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build folders
+build/
+dist/
+*.spec
+
+# Data files (if sensitive)
+data/
+credentials.json
+*.json
+
+# Virtual environment
+venv/
+env/
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
