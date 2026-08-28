@@ -4,7 +4,7 @@ import json
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-
+import config
 # Import from other modules
 from data_scraper import VeterinaryDataScraper
 from config import Config
@@ -106,14 +106,14 @@ class PetdentityScraperGUI:
             
             script_dir = os.path.dirname(os.path.abspath(__file__))
             parent_dir = os.path.dirname(script_dir)
-            logo_path = os.path.join(parent_dir, 'assets', '566598750_829426946347885_1537385991389694105_n.png')
+            logo_path = os.path.join(parent_dir, 'assets', 'logo.png')
             
             if os.path.exists(logo_path):
                 # Load and resize the image
                 image = Image.open(logo_path)
                 
-                # Resize to 40x40 for the title bar
-                image = image.resize((40, 40), Image.Resampling.LANCZOS)
+                # Title bar size
+                image = image.resize((64, 64), Image.Resampling.LANCZOS)
                 self.logo_image = ImageTk.PhotoImage(image)
                 
                 # Create label with image
@@ -127,13 +127,13 @@ class PetdentityScraperGUI:
                 print(f"✅ Logo loaded from: {logo_path}")
             else:
                 # No logo found, just show text
-                title_label = ttk.Label(title_frame, text="🐾 Petdentity Veterinary Data Scraper",
+                title_label = ttk.Label(title_frame, text="Petdentity Veterinary Data Scraper",
                                        font=('Arial', 16, 'bold'))
                 title_label.grid(row=0, column=0)
                 print(f"⚠️ Logo file not found: {logo_path}")
         except ImportError:
             # PIL not installed, just show text
-            title_label = ttk.Label(title_frame, text="🐾 Petdentity Veterinary Data Scraper",
+            title_label = ttk.Label(title_frame, text="Petdentity Veterinary Data Scraper",
                                    font=('Arial', 16, 'bold'))
             title_label.grid(row=0, column=0)
             print("⚠️ PIL not installed, cannot display logo image")
@@ -214,6 +214,7 @@ class PetdentityScraperGUI:
         # Define columns - Added 'Contact Address' after 'Complete Address'
         columns = (
             '#',
+            'Breed',
             'Pet Owner Fullname',
             'Mobile Number',
             'Complete Address',
@@ -255,33 +256,34 @@ class PetdentityScraperGUI:
         # Define column widths
         column_widths = {
             '#': 40,
-            'Pet Owner Fullname': 200,
-            'Mobile Number': 130,
-            'Complete Address': 250,
-            'Contact Address': 250,  # NEW: Contact Address column
-            'Additional Contact 1': 200,
-            'Additional Contact 2': 200,
-            'Additional Contact 3': 200,
-            'Date of Birth': 100,
+            'Breed': 150,
+            'Pet Owner Fullname': 120,
+            'Mobile Number': 100,
+            'Complete Address': 150,
+            'Contact Address': 150,  # NEW: Contact Address column
+            'Additional Contact 1': 150,
+            'Additional Contact 2': 150,
+            'Additional Contact 3': 150,
+            'Date of Birth': 80,
             'Weight (Kg)': 80,
-            'Sex': 70,
-            'Color / Markings': 150,
-            'Microchip Number': 150,
-            'Vaccination Date': 110,
-            'Vaccine Type': 110,
-            'Vaccine Serial': 130,
-            'Vaccine Lot': 110,
-            'Vaccine Expiration': 110,
-            'Vaccination Date 2': 110,
-            'Vaccine Type 2': 110,
-            'Vaccine Serial 2': 130,
-            'Vaccine Lot 2': 110,
-            'Vaccine Expiration 2': 110,
-            'Vaccination Date 3': 110,
-            'Vaccine Type 3': 110,
-            'Vaccine Serial 3': 130,
-            'Vaccine Lot 3': 110,
-            'Vaccine Expiration 3': 110
+            'Sex': 80,
+            'Color / Markings': 116,
+            'Microchip Number': 116,
+            'Vaccination Date': 116,
+            'Vaccine Type': 100,
+            'Vaccine Serial': 100,
+            'Vaccine Lot': 100,
+            'Vaccine Expiration': 100,
+            'Vaccination Date 2': 100,
+            'Vaccine Type 2': 100,
+            'Vaccine Serial 2': 100,
+            'Vaccine Lot 2': 100,
+            'Vaccine Expiration 2': 100,
+            'Vaccination Date 3': 100,
+            'Vaccine Type 3': 100,
+            'Vaccine Serial 3': 100,
+            'Vaccine Lot 3': 100,
+            'Vaccine Expiration 3': 100
         }
 
         # Configure headings and columns
@@ -539,10 +541,11 @@ class PetdentityScraperGUI:
 
             row_values = (
                 idx,
+                record.get('breed', ''),
                 record.get('owner_name', ''),
                 record.get('mobile', ''),
                 complete_address,
-                contact_address,  # NEW: Contact Address column
+                contact_address, 
                 contacts[0] if contacts[0] else '',
                 contacts[1] if contacts[1] else '',
                 contacts[2] if contacts[2] else '',

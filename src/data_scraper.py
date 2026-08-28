@@ -1,6 +1,7 @@
 import time
 import json
 import re
+import config
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
@@ -308,15 +309,6 @@ class VeterinaryDataScraper:
                 elif label_text == 'Weight':
                     self.data['weight'] = value
                     print(f"    ✅ Weight: {value}")
-                elif label_text == 'Height':
-                    self.data['height'] = value
-                    print(f"    ✅ Height: {value}")
-                elif label_text == 'Animal':
-                    self.data['species'] = value
-                    print(f"    ✅ Species: {value}")
-                elif label_text == 'Type':
-                    self.data['animal_type'] = value
-                    print(f"    ✅ Type: {value}")
                 elif label_text == 'Breed':
                     self.data['breed'] = value
                     print(f"    ✅ Breed: {value}")
@@ -529,7 +521,7 @@ class VeterinaryDataScraper:
                         'Account', 'Logout', 'Dashboard', 'Reports', 'Help',
                         'Name', 'Mobile', 'Address', 'Contact', 'Phone', 'Email',
                         'Type', 'Form', 'RFID', 'Microchip', 'Pet', 'Animal',
-                        'Gender', 'Breed', 'BirthDate', 'Age', 'Weight', 'Coat']
+                        'Gender', 'BirthDate', 'Age', 'Weight', 'Coat']
         
         if phones:
             owner_found = False
