@@ -165,8 +165,6 @@ class PetdentityScraperGUI:
         ttk.Label(control_frame, text="Pet Page URL:").grid(row=0, column=0, padx=5, sticky=tk.W)
         self.url_entry = ttk.Entry(control_frame, width=60)
         self.url_entry.grid(row=0, column=1, padx=5, sticky=(tk.W, tk.E))
-
-        # Buttons - REMOVED Login button
         self.scrape_btn = ttk.Button(control_frame, text="📥 Scrape & Add", command=self.scrape_and_add,
                                      state='disabled')
         self.scrape_btn.grid(row=0, column=2, padx=5)

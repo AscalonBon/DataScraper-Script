@@ -224,12 +224,6 @@ class VeterinaryDataScraper:
             'pet_status': '',
             'owner_name': '',
             'mobile': '',
-            # TWO FULLY SEPARATE ADDRESS COLUMNS — no merging, no fallback,
-            # no guessing which one is "real". Each is sourced from exactly
-            # one place on the page and shown as-is, even if blank or odd.
-            #
-            # 'address'          = ADDRESS PANEL only (house_no + city + province)
-            # 'contact_address'  = CONTACTS PANEL's own Address column only
             'address': '',
             'house_no': '',
             'city_municipality': '',
