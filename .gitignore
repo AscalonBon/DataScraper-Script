@@ -4,11 +4,6 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Build folders
-build/
-dist/
-*.spec
-
 # Data files (if sensitive)
 data/
 credentials.json
