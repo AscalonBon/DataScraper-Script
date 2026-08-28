@@ -1,1 +1,4 @@
 ./src/__pycache__/
+./build
+./data/credentials.json
+./build
